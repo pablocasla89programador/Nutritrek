@@ -1,0 +1,129 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6f8b" id="tc"><title>Nutri Trek</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-maskable-512.png">
+<style>
+:root{--bg:#edf2f3;--card:#fff;--tx:#12262d;--mu:#5d727a;--ac:#1f6f8b;--on:#fff;--bd:#d3dfe2;--in:#f5f9fa;--m0:#d98a2b;--m1:#2a86a8;--m2:#8a3f72;--m3:#3d4f9a;--dg:#b3382c}
+:root[data-t=dark]{--bg:#0e1b24;--card:#16262f;--tx:#e6eff2;--mu:#8ea6af;--ac:#6cc3dc;--on:#0e1b24;--bd:#26404d;--in:#112029;--m0:#f0a94f;--m1:#6cc3dc;--m2:#d78ac0;--m3:#8e9de0;--dg:#ff8a7a}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.4 system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+#app{padding:calc(14px + env(safe-area-inset-top)) 16px 160px;max-width:640px;margin:auto}
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.bar h1{flex:1;font-size:27px;font-weight:800;letter-spacing:-.02em}
+h2{font-size:18px;margin:18px 0 4px}h3{font-size:19px;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--bd);border-left:5px solid var(--k,var(--bd));border-radius:8px;padding:11px 13px;margin:7px 0;display:flex;flex-direction:column;gap:3px}
+.mu{color:var(--mu);font-size:13px}.c{text-align:center;margin:36px 0}
+.mx{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--mu);font-size:13px}
+.tag{font-style:normal;font-size:12px;border:1px solid var(--bd);border-radius:20px;padding:0 8px;color:var(--mu)}
+label{display:block;font-size:13px;color:var(--mu);margin-top:9px}
+input,select{width:100%;font:inherit;color:var(--tx);background:var(--in);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-top:3px}
+button{font:inherit;border-radius:10px;padding:10px 14px;background:var(--in);color:var(--tx);border:1px solid var(--bd)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.b{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:700}.g{background:none;border-color:transparent}.dg{color:var(--dg)}
+.fab{position:fixed;right:16px;bottom:calc(88px + env(safe-area-inset-bottom));box-shadow:0 4px 14px #0005;border-radius:26px;padding:13px 20px}
+.r2,.r4{display:grid;gap:8px}.r2{grid-template-columns:1fr 1fr}.r4{grid-template-columns:repeat(4,1fr)}
+.row{display:grid;grid-template-columns:1fr 78px 42px;gap:6px;margin-top:6px}.row *{margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}.ch{display:flex;gap:6px;align-items:center;border:1px solid var(--bd);border-radius:20px;padding:6px 12px;margin:0;color:var(--tx)}.ch input{width:auto;margin:0}
+.bar2{height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin:3px 0 6px}.bar2 i{display:block;height:100%;background:var(--ac)}
+#nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+#nav button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--mu);padding:4px 0}
+#nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#nav .on{color:var(--ac);font-weight:700}
+#nav .mid svg{background:var(--ac);color:var(--on);border-radius:50%;width:52px;height:52px;padding:13px;margin-top:-26px;border:4px solid var(--bg)}
+.ov{position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;z-index:9}.hid{display:none}
+.sh{background:var(--card);width:100%;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
+.sh label{margin-top:4px}
+#t{position:fixed;left:50%;transform:translateX(-50%);bottom:110px;background:var(--tx);color:var(--bg);padding:9px 16px;border-radius:20px;z-index:10;font-size:13px;max-width:90%;text-align:center}
+</style></head><body>
+<div id="app"></div><nav id="nav"></nav>
+<div id="ov" class="ov hid"><div class="sh" id="sh"></div></div><div id="t" hidden></div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2,9),
+esc=s=>String(s??'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),num=v=>parseFloat(v)||0,
+MEALS=['Desayuno','Almuerzo','Merienda','Cena'],CATS=['Entrada','Plato principal','Postre','Picar','Bebida','Infusión'];
+let S=JSON.parse(localStorage.getItem('nia')||'null')||{pantry:[],projects:[],profile:{},set:{theme:'auto',key:'',model:'gemini-2.5-flash'}},
+tab='menus',pid=null,showA=false,cur={},ia={};
+const save=()=>localStorage.setItem('nia',JSON.stringify(S)),
+P=()=>S.projects.find(p=>p.id==pid),
+toast=m=>{const t=$('#t');t.textContent=m;t.hidden=false;clearTimeout(toast.i);toast.i=setTimeout(()=>t.hidden=true,3500)},
+show=h=>{$('#sh').innerHTML=h;$('#ov').classList.remove('hid')},
+opt=(a,v)=>a.map(x=>`<option ${x==v?'selected':''}>${x}</option>`).join(''),
+fld=(l,id,v,t='text')=>`<label>${l}<input id="${id}" type="${t}" value="${esc(v)}"${t=='number'?' inputmode="decimal" step="any"':''}></label>`,
+fs=(l,k,t='text')=>{const[o,n]=k.split('.');return`<label>${l}<input data-s="${k}" type="${t}" value="${esc(S[o][n])}"${t=='number'?' inputmode="decimal"':''}></label>`},
+nm=id=>S.pantry.find(x=>x.id==id)?.name||'(eliminado)',
+mac=m=>(m.items||[]).reduce((a,i)=>{const f=S.pantry.find(x=>x.id==i.id);if(f){const k=i.g/100;a[0]+=f.kcal*k;a[1]+=f.prot*k;a[2]+=f.carb*k;a[3]+=f.fat*k}return a},[0,0,0,0]),
+fm=a=>`<span>${Math.round(a[0])} kcal</span><span>P ${Math.round(a[1])}</span><span>C ${Math.round(a[2])}</span><span>G ${Math.round(a[3])}</span>`,
+age=()=>S.profile.birth?Math.floor((Date.now()-new Date(S.profile.birth))/31557600000):0,
+need=()=>{const p=S.profile,a=age();if(!(p.weight&&p.height&&a&&p.sex))return null;const b=10*p.weight+6.25*p.height-5*a+(p.sex=='M'?5:-161);return[b,b*1.6,b*2].map(v=>Math.round(v))},
+theme=()=>{const t=S.set.theme;document.documentElement.dataset.t=t=='auto'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;$('#tc').content=getComputedStyle(document.documentElement).getPropertyValue('--ac').trim()},
+img=f=>new Promise(ok=>{const i=new Image();i.onload=()=>{const k=Math.min(1,1024/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1])};i.src=URL.createObjectURL(f)});
+async function gem(parts){
+ if(!S.set.key)throw Error('Cargá tu API key de Gemini en Ajustes');
+ if(!navigator.onLine)throw Error('Sin conexión: la IA necesita internet');
+ const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${S.set.model}:generateContent?key=${S.set.key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts}],generationConfig:{responseMimeType:'application/json'}})});
+ const d=await r.json();if(!r.ok)throw Error(d.error?.message||'Error de la IA');
+ return JSON.parse((d.candidates?.[0]?.content?.parts||[]).map(p=>p.text).join('').replace(/```json|```/g,''))}
+const fill=o=>['kcal','prot','carb','fat'].forEach(k=>$('#f_'+k).value=Math.round(num(o[k])*10)/10),
+NUT='Respondé SOLO JSON {"kcal":n,"prot":n,"carb":n,"fat":n} por 100 g (prot=proteínas, carb=carbohidratos, fat=grasas totales).';
+async function lab(f){toast('Leyendo etiqueta…');try{fill(await gem([{inlineData:{mimeType:'image/jpeg',data:await img(f)}},{text:'Es la tabla nutricional de un empaque. '+NUT+' Si está por porción, convertí con el peso de la porción.'}]));toast('Listo, revisá los valores')}catch(e){toast(e.message)}}
+const col=()=>{cur={...cur,day:num($('#dd').value)||1,meal:$('#mm').value,cat:$('#mc').value,name:$('#mn').value,items:$$('.it').map(r=>({id:r.querySelector('select').value,g:num(r.querySelector('input').value)}))}};
+function fF(f={}){cur=f;show(`<h3>${f.id?'Editar':'Nuevo'} alimento</h3>${fld('Nombre','fn',f.name)}<label>Tipo<select id="fk"><option value="mezcla" ${f.kind!='listo'?'selected':''}>Suelto (se mezcla con otros)</option><option value="listo" ${f.kind=='listo'?'selected':''}>Listo (liofilizado, deshidratado, termoestabilizado…)</option></select></label>${fld('Descripción (la IA la usa para estimar)','fd',f.desc)}<div class="r2">${fld('Peso neto (g)','fnet',f.net,'number')}${fld('Peso bruto con envase (g)','fgr',f.gross,'number')}</div><label>Información nutricional por 100 g</label><div class="r4">${[['kcal','kcal'],['prot','Prot'],['carb','Carb'],['fat','Gras']].map(([k,l])=>fld(l,'f_'+k,f[k],'number')).join('')}</div><div class="r2"><button data-a="scan">Foto de etiqueta</button><button data-a="est">Estimar con IA</button></div><input id="ph" type="file" accept="image/*" capture="environment" hidden><button class="b" data-a="saveF">Guardar</button>${f.id?'<button class="dg" data-a="delF">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
+function fM(m){cur=m;const pn=S.pantry.length;show(`<h3>${m.id?'Editar':'Nueva'} comida</h3><div class="r2">${fld('Día','dd',m.day||1,'number')}<label>Comida<select id="mm">${opt(MEALS,m.meal)}</select></label></div><label>Categoría<select id="mc">${opt(CATS,m.cat)}</select></label>${fld('Nombre o notas','mn',m.name)}<label>Alimentos de la despensa (gramos)</label>${m.items.map((it,i)=>`<div class="row it"><select>${S.pantry.map(f=>`<option value="${f.id}" ${f.id==it.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select><input type="number" inputmode="decimal" placeholder="g" value="${it.g||''}"><button data-a="delRow" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}<button data-a="addRow">Agregar alimento</button><button class="b" data-a="saveM">Guardar</button>${m.id?'<button class="dg" data-a="delM">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
+const A={
+tab:d=>{tab=d.k;pid=null;R()},close:()=>$('#ov').classList.add('hid'),
+addF:()=>fF(),editF:d=>fF(S.pantry.find(f=>f.id==d.id)),scan:()=>$('#ph').click(),
+saveF:()=>{const f={id:cur.id||uid(),name:$('#fn').value.trim(),kind:$('#fk').value,desc:$('#fd').value,net:num($('#fnet').value),gross:num($('#fgr').value)};['kcal','prot','carb','fat'].forEach(k=>f[k]=num($('#f_'+k).value));if(!f.name)return toast('Falta el nombre');const i=S.pantry.findIndex(x=>x.id==f.id);i<0?S.pantry.push(f):S.pantry[i]=f;save();A.close();R()},
+delF:()=>{if(confirm('¿Eliminar este alimento?')){S.pantry=S.pantry.filter(f=>f.id!=cur.id);save();A.close();R()}},
+est:async()=>{const n=$('#fn').value.trim();if(!n)return toast('Poné un nombre');toast('Estimando…');try{fill(await gem([{text:`Estimá la información nutricional de este alimento tal como se lleva en la mochila (sin preparar): "${n}". ${$('#fd').value}. ${NUT}`}]));toast('Listo, revisá los valores')}catch(e){toast(e.message)}},
+newP:()=>{const n=prompt('Nombre del proyecto (ej. El Chaltén 2026)');if(n?.trim()){const p={id:uid(),name:n.trim(),menus:[]};S.projects.push(p);save();pid=p.id;R()}},
+openP:d=>{pid=d.id;R()},back:()=>{pid=null;R()},tgA:()=>{showA=!showA;R()},
+pmenu:()=>show(`<h3>${esc(P().name)}</h3><button data-a="editP">Editar nombre</button><button data-a="archP">${P().arch?'Desarchivar':'Archivar'}</button><button class="dg" data-a="delP">Eliminar proyecto</button><button class="g" data-a="close">Cerrar</button>`),
+editP:()=>{const p=P(),n=prompt('Nombre del proyecto',p.name);A.close();if(n?.trim()){p.name=n.trim();save();R()}},
+archP:()=>{P().arch=!P().arch;save();A.close();pid=null;R()},
+delP:()=>{if(confirm('¿Eliminar el proyecto y todos sus menús?')){S.projects=S.projects.filter(p=>p.id!=pid);save();A.close();pid=null;R()}},
+addM:()=>fM({items:[]}),editM:d=>{const m=P().menus.find(x=>x.id==d.id);fM({...m,items:m.items.map(i=>({...i}))})},
+addRow:()=>{col();if(!S.pantry.length)return toast('Primero cargá alimentos en la Despensa');cur.items.push({id:S.pantry[0].id,g:0});fM(cur)},
+delRow:d=>{col();cur.items.splice(+d.i,1);fM(cur)},
+saveM:()=>{col();const p=P(),i=p.menus.findIndex(m=>m.id==cur.id);i<0?p.menus.push({...cur,id:uid()}):p.menus[i]=cur;save();A.close();R()},
+delM:()=>{if(confirm('¿Eliminar esta comida?')){P().menus=P().menus.filter(m=>m.id!=cur.id);save();A.close();R()}},
+gen:async()=>{ia={...ia,days:num($('#iad').value)||1,act:$('#iaa').value,clima:$('#iac').value,meals:$$('.chips input:checked').map(x=>x.value),p:$('#ip').value};
+ if(!ia.meals.length)return toast('Elegí qué comidas armar');if(!S.pantry.length)return toast('Cargá alimentos en la Despensa');
+ ia.busy=true;ia.res=null;R();
+ try{const n=need(),p=S.profile;
+ const r=await gem([{text:`Sos nutricionista deportivo de montaña. Armá menús para un trekking.
+Días: ${ia.days}. Actividades: ${ia.act||'trekking con mochila'}. Clima: ${ia.clima||'no indicado'}. Comidas a armar cada día: ${ia.meals.join(', ')}.
+Persona: ${p.sex=='M'?'hombre':p.sex=='F'?'mujer':'sexo no indicado'}, ${age()||'?'} años, ${p.weight||'?'} kg, ${p.height||'?'} cm${n?`, requerimiento estimado ${n[1]} a ${n[2]} kcal/día`:''}.
+Despensa (id|nombre|tipo|descripción|valores por 100 g|disponible):
+${S.pantry.map(f=>`${f.id}|${f.name}|${f.kind}|${f.desc||''}|${f.kcal} kcal P${f.prot} C${f.carb} G${f.fat}|${f.net} g`).join('\n')}
+Usá SOLO alimentos de la despensa con su id exacto y sin superar los gramos disponibles sumando todos los días. Priorizá calorías y carbohidratos, poco peso y preparación fácil en la montaña. Ajustá las kcal diarias al requerimiento.
+Respondé SOLO un array JSON: [{"day":1,"meal":"${MEALS[0]}","cat":"${CATS[1]}","name":"descripción corta","items":[{"id":"...","g":50}]}]. meal ∈ ${MEALS.join('/')}; cat ∈ ${CATS.join('/')}.`}]);
+ ia.res=(Array.isArray(r)?r:r.menus||[]).map(m=>({day:num(m.day)||1,meal:MEALS.includes(m.meal)?m.meal:'Almuerzo',cat:CATS.includes(m.cat)?m.cat:'Plato principal',name:m.name||'',items:(m.items||[]).filter(i=>S.pantry.some(f=>f.id==i.id)).map(i=>({id:i.id,g:num(i.g)}))})).filter(m=>m.items.length);
+ if(!ia.res.length)toast('La IA no devolvió menús válidos, probá de nuevo')}catch(e){toast(e.message)}
+ ia.busy=false;R()},
+saveIA:()=>{let p=S.projects.find(x=>x.id==ia.p);if(!p){const n=prompt('Nombre del nuevo proyecto (ej. El Chaltén 2026)');if(!n?.trim())return;p={id:uid(),name:n.trim(),menus:[]};S.projects.push(p)}ia.res.forEach(m=>p.menus.push({...m,id:uid()}));save();ia.res=null;tab='menus';pid=p.id;R()},
+exp:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,set:{...S.set,key:''}})],{type:'application/json'}));a.download='nutri-ia-copia.json';a.click()}};
+const mk=m=>`<div class="card" style="--k:var(--m${MEALS.indexOf(m.meal)})" ${m.id?`data-a="editM" data-id="${m.id}"`:''}><div><b>${m.meal}</b> <i class="tag">${m.cat}</i></div><div>${esc(m.name)}</div><div class="mu">${m.items.map(i=>`${esc(nm(i.id))} ${i.g} g`).join(', ')}</div><div class="mx">${fm(mac(m))}</div></div>`,
+srt=a=>[...a].sort((x,y)=>x.day-y.day||MEALS.indexOf(x.meal)-MEALS.indexOf(y.meal));
+function vDesp(){const n=S.pantry.reduce((a,f)=>a+f.net,0),g=S.pantry.reduce((a,f)=>a+(f.gross||f.net),0);
+return`<div class="bar"><h1>Despensa</h1></div><div class="card"><span class="mu">Peso total a cargar</span><b>${(n/1000).toFixed(2)} kg neto, ${(g/1000).toFixed(2)} kg bruto</b></div>${S.pantry.map(f=>`<div class="card" style="--k:var(--m${f.kind=='listo'?0:1})" data-a="editF" data-id="${f.id}"><div><b>${esc(f.name)}</b> <i class="tag">${f.kind=='listo'?'listo':'suelto'}</i></div><div class="mu">${f.net} g neto, ${f.gross||f.net} g bruto</div><div class="mx"><span>por 100 g</span>${fm([f.kcal,f.prot,f.carb,f.fat])}</div></div>`).join('')||'<p class="mu c">Tu despensa está vacía. Agregá el primer alimento.</p>'}<button class="b fab" data-a="addF">Agregar alimento</button>`}
+function vMenus(){const p=P();
+if(!p){const l=S.projects.filter(x=>!!x.arch==showA);return`<div class="bar"><h1>Menús</h1><button class="b" data-a="newP">Nuevo proyecto</button></div>${l.map(x=>`<div class="card" style="--k:var(--ac)" data-a="openP" data-id="${x.id}"><b>${esc(x.name)}</b><span class="mu">${x.menus.length} comidas en ${Math.max(0,...x.menus.map(m=>m.day))} días</span></div>`).join('')||`<p class="mu c">${showA?'No hay proyectos archivados.':'Creá tu primer proyecto, por ejemplo “El Chaltén 2026”.'}</p>`}<button class="g mu" data-a="tgA">${showA?'Ver proyectos activos':'Ver archivados'}</button>`}
+const d=[...new Set(p.menus.map(m=>m.day))].sort((a,b)=>a-b),n=need();
+return`<div class="bar"><button class="g" data-a="back" aria-label="Volver">‹</button><h1>${esc(p.name)}</h1><button class="g" data-a="pmenu" aria-label="Opciones">⋯</button></div>${d.map(day=>{const ms=srt(p.menus.filter(m=>m.day==day)),t=ms.reduce((a,m)=>{mac(m).forEach((v,i)=>a[i]+=v);return a},[0,0,0,0]);return`<h2>Día ${day}</h2><div class="mx">${fm(t)}</div>${n?`<div class="bar2"><i style="width:${Math.min(100,t[0]/n[1]*100)}%"></i></div><div class="mu">Objetivo de ${n[1]} a ${n[2]} kcal</div>`:''}${ms.map(mk).join('')}`}).join('')||'<p class="mu c">Sin comidas todavía. Agregá una o pedile menús a Nutri IA.</p>'}<button class="b fab" data-a="addM">Agregar comida</button>`}
+function vIA(){const ps=S.projects.filter(p=>!p.arch);
+return`<div class="bar"><h1>Nutri IA</h1></div><div class="card" style="--k:var(--m2)"><label>Guardar en<select id="ip">${ps.map(p=>`<option value="${p.id}" ${p.id==ia.p?'selected':''}>${esc(p.name)}</option>`).join('')}<option value="">Nuevo proyecto</option></select></label>${fld('Cantidad de días','iad',ia.days||3,'number')}${fld('Actividades (ej. caminata de 8 h con mochila)','iaa',ia.act)}${fld('Clima (ej. frío, de 0 a 10 °C, viento)','iac',ia.clima)}<label>Comidas a armar</label><div class="chips">${MEALS.map(m=>`<label class="ch"><input type="checkbox" value="${m}" ${(ia.meals||['Desayuno','Almuerzo','Cena']).includes(m)?'checked':''}>${m}</label>`).join('')}</div><button class="b" data-a="gen" ${ia.busy?'disabled':''}>${ia.busy?'Armando menús…':'Armar menús'}</button></div>${ia.res?`<h2>Propuesta</h2>${srt(ia.res).map(m=>mk({...m,id:0})).join('')}<button class="b" data-a="saveIA">Guardar en el proyecto</button>`:''}`}
+function vPerfil(){const p=S.profile,n=need();
+return`<div class="bar"><h1>Perfil</h1></div><div class="card">${fs('Fecha de nacimiento','profile.birth','date')}<label>Sexo<select data-s="profile.sex"><option value="">Elegir</option><option value="F" ${p.sex=='F'?'selected':''}>Mujer</option><option value="M" ${p.sex=='M'?'selected':''}>Hombre</option></select></label>${fs('Peso (kg)','profile.weight','number')}${fs('Altura (cm)','profile.height','number')}</div><div class="card" style="--k:var(--ac)">${n?`<b>Necesidad estimada</b><span>Metabolismo basal: ${n[0]} kcal por día.</span><span>Trekking con mochila: de ${n[1]} a ${n[2]} kcal por día.</span>`:'<span class="mu">Completá los cuatro datos para calcular tus necesidades. Nutri IA las usa al armar menús.</span>'}</div>`}
+function vAj(){return`<div class="bar"><h1>Ajustes</h1></div><div class="card"><label>Tema<select data-s="set.theme">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([v,l])=>`<option value="${v}" ${S.set.theme==v?'selected':''}>${l}</option>`).join('')}</select></label>${fs('API key de Gemini','set.key','password')}${fs('Modelo de Gemini','set.model')}<p class="mu">La key queda solo en este celular. Restringila a tu dominio de Firebase en Google AI Studio.</p></div><div class="card"><button data-a="exp">Exportar copia de seguridad</button><button onclick="$('#imp').click()">Importar copia</button><input id="imp" type="file" accept=".json" hidden></div>`}
+const TABS=[['desp','Despensa','<path d="M5 8h14l-1 12H6zM8 8V5h8v3"/>'],['ia','Nutri IA','<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>'],['menus','Menús','<path d="M7 3v8M5 3v5a2 2 0 004 0V3M7 11v10M17 21V3c-2 1-3 4-3 8h3"/>'],['perfil','Perfil','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'],['aj','Ajustes','<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>']];
+function R(){$('#app').innerHTML={desp:vDesp,ia:vIA,menus:vMenus,perfil:vPerfil,aj:vAj}[tab]();
+$('#nav').innerHTML=TABS.map(([k,n,p])=>`<button data-a="tab" data-k="${k}" class="${k==tab?'on':''} ${k=='menus'?'mid':''}"><svg viewBox="0 0 24 24">${p}</svg><span>${n}</span></button>`).join('')}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A[b.dataset.a](b.dataset)});
+$('#ov').addEventListener('click',e=>{if(e.target.id=='ov')A.close()});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.dataset.s){const[o,k]=t.dataset.s.split('.');S[o][k]=t.value;save();if(o=='set')theme();if(tab=='perfil')R()}
+ else if(t.id=='ph'&&t.files[0])lab(t.files[0]);
+ else if(t.id=='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);S={...d,set:{...d.set,key:S.set.key}};save();theme();R();toast('Copia restaurada')}catch{toast('Archivo inválido')}};r.readAsText(t.files[0])}});
+matchMedia('(prefers-color-scheme:dark)').onchange=theme;
+theme();R();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
