@@ -36,13 +36,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </style></head><body>
 <div id="app"></div><nav id="nav"></nav>
 <div id="ov" class="ov hid"><div class="sh" id="sh"></div></div><div id="t" hidden></div>
+<script src="/__/firebase/8.10.1/firebase-app.js"></script>
+<script src="/__/firebase/8.10.1/firebase-auth.js"></script>
+<script src="/__/firebase/8.10.1/firebase-firestore.js"></script>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2,9),
 esc=s=>String(s??'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),num=v=>parseFloat(v)||0,
 MEALS=['Desayuno','Almuerzo','Merienda','Cena'],CATS=['Entrada','Plato principal','Postre','Picar','Bebida','Infusión'];
 let S=JSON.parse(localStorage.getItem('nia')||'null')||{pantry:[],projects:[],profile:{},set:{theme:'auto',key:'',model:'gemini-2.5-flash'}},
-tab='menus',pid=null,showA=false,cur={},ia={};
-const save=()=>localStorage.setItem('nia',JSON.stringify(S)),
+tab='menus',pid=null,showA=false,cur={},ia={},user=null,db=null,tm,syncing=0;
+const store=()=>localStorage.setItem('nia',JSON.stringify(S)),
+save=()=>{S.u=Date.now();S.d=1;store();clearTimeout(tm);tm=setTimeout(sync,1500)},
 P=()=>S.projects.find(p=>p.id==pid),
 toast=m=>{const t=$('#t');t.textContent=m;t.hidden=false;clearTimeout(toast.i);toast.i=setTimeout(()=>t.hidden=true,3500)},
 show=h=>{$('#sh').innerHTML=h;$('#ov').classList.remove('hid')},
@@ -100,7 +104,10 @@ Respondé SOLO un array JSON: [{"day":1,"meal":"${MEALS[0]}","cat":"${CATS[1]}",
  if(!ia.res.length)toast('La IA no devolvió menús válidos, probá de nuevo')}catch(e){toast(e.message)}
  ia.busy=false;R()},
 saveIA:()=>{let p=S.projects.find(x=>x.id==ia.p);if(!p){const n=prompt('Nombre del nuevo proyecto (ej. El Chaltén 2026)');if(!n?.trim())return;p={id:uid(),name:n.trim(),menus:[]};S.projects.push(p)}ia.res.forEach(m=>p.menus.push({...m,id:uid()}));save();ia.res=null;tab='menus';pid=p.id;R()},
-exp:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,set:{...S.set,key:''}})],{type:'application/json'}));a.download='nutri-ia-copia.json';a.click()}};
+exp:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,set:{...S.set,key:''}})],{type:'application/json'}));a.download='nutri-ia-copia.json';a.click()},
+login:async()=>{if(!db)return toast('El login con Google funciona en la versión web instalada, no en el APK');try{await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(e){toast(e.code=='auth/popup-blocked'?'Permití las ventanas emergentes':e.code=='auth/popup-closed-by-user'?'Inicio cancelado':e.message)}},
+logout:async()=>{await firebase.auth().signOut();S.link=null;store()},
+syncNow:()=>{toast('Sincronizando…');sync()}};
 const mk=m=>`<div class="card" style="--k:var(--m${MEALS.indexOf(m.meal)})" ${m.id?`data-a="editM" data-id="${m.id}"`:''}><div><b>${m.meal}</b> <i class="tag">${m.cat}</i></div><div>${esc(m.name)}</div><div class="mu">${m.items.map(i=>`${esc(nm(i.id))} ${i.g} g`).join(', ')}</div><div class="mx">${fm(mac(m))}</div></div>`,
 srt=a=>[...a].sort((x,y)=>x.day-y.day||MEALS.indexOf(x.meal)-MEALS.indexOf(y.meal));
 function vDesp(){const n=S.pantry.reduce((a,f)=>a+f.net,0),g=S.pantry.reduce((a,f)=>a+(f.gross||f.net),0);
@@ -113,17 +120,29 @@ function vIA(){const ps=S.projects.filter(p=>!p.arch);
 return`<div class="bar"><h1>Nutri IA</h1></div><div class="card" style="--k:var(--m2)"><label>Guardar en<select id="ip">${ps.map(p=>`<option value="${p.id}" ${p.id==ia.p?'selected':''}>${esc(p.name)}</option>`).join('')}<option value="">Nuevo proyecto</option></select></label>${fld('Cantidad de días','iad',ia.days||3,'number')}${fld('Actividades (ej. caminata de 8 h con mochila)','iaa',ia.act)}${fld('Clima (ej. frío, de 0 a 10 °C, viento)','iac',ia.clima)}<label>Comidas a armar</label><div class="chips">${MEALS.map(m=>`<label class="ch"><input type="checkbox" value="${m}" ${(ia.meals||['Desayuno','Almuerzo','Cena']).includes(m)?'checked':''}>${m}</label>`).join('')}</div><button class="b" data-a="gen" ${ia.busy?'disabled':''}>${ia.busy?'Armando menús…':'Armar menús'}</button></div>${ia.res?`<h2>Propuesta</h2>${srt(ia.res).map(m=>mk({...m,id:0})).join('')}<button class="b" data-a="saveIA">Guardar en el proyecto</button>`:''}`}
 function vPerfil(){const p=S.profile,n=need();
 return`<div class="bar"><h1>Perfil</h1></div><div class="card">${fs('Fecha de nacimiento','profile.birth','date')}<label>Sexo<select data-s="profile.sex"><option value="">Elegir</option><option value="F" ${p.sex=='F'?'selected':''}>Mujer</option><option value="M" ${p.sex=='M'?'selected':''}>Hombre</option></select></label>${fs('Peso (kg)','profile.weight','number')}${fs('Altura (cm)','profile.height','number')}</div><div class="card" style="--k:var(--ac)">${n?`<b>Necesidad estimada</b><span>Metabolismo basal: ${n[0]} kcal por día.</span><span>Trekking con mochila: de ${n[1]} a ${n[2]} kcal por día.</span>`:'<span class="mu">Completá los cuatro datos para calcular tus necesidades. Nutri IA las usa al armar menús.</span>'}</div>`}
-function vAj(){return`<div class="bar"><h1>Ajustes</h1></div><div class="card"><label>Tema<select data-s="set.theme">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([v,l])=>`<option value="${v}" ${S.set.theme==v?'selected':''}>${l}</option>`).join('')}</select></label>${fs('API key de Gemini','set.key','password')}${fs('Modelo de Gemini','set.model')}<p class="mu">La key queda solo en este celular. Restringila a tu dominio de Firebase en Google AI Studio.</p></div><div class="card"><button data-a="exp">Exportar copia de seguridad</button><button onclick="$('#imp').click()">Importar copia</button><input id="imp" type="file" accept=".json" hidden></div>`}
+function vAj(){return`<div class="bar"><h1>Ajustes</h1></div>${acc()}<div class="card"><label>Tema<select data-s="set.theme">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([v,l])=>`<option value="${v}" ${S.set.theme==v?'selected':''}>${l}</option>`).join('')}</select></label>${fs('API key de Gemini','set.key','password')}${fs('Modelo de Gemini','set.model')}<p class="mu">La key queda solo en este celular. Restringila a tu dominio de Firebase en Google AI Studio.</p></div><div class="card"><button data-a="exp">Exportar copia de seguridad</button><button onclick="$('#imp').click()">Importar copia</button><input id="imp" type="file" accept=".json" hidden></div>`}
+const acc=()=>user?`<div class="card" style="--k:var(--ac)"><b>${esc(user.displayName||'Cuenta')}</b><span class="mu">${esc(user.email)}</span><span class="mu">${S.d?'Hay cambios pendientes de subir':'Todo sincronizado'}${S.last?', revisado '+new Date(S.last).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''}</span><button data-a="syncNow">Sincronizar ahora</button><button class="g" data-a="logout">Cerrar sesión</button></div>`:`<div class="card" style="--k:var(--ac)"><b>Cuenta</b><span class="mu">Entrá con Google para guardar tus datos en la nube y verlos desde cualquier dispositivo.</span><button class="b" data-a="login">Entrar con Google</button></div>`;
+async function sync(){
+ if(!user||!db||!navigator.onLine||syncing)return;syncing=1;
+ try{const ref=db.doc('users/'+user.uid),snap=await ref.get(),r=snap.exists?snap.data():null,empty=!S.pantry.length&&!S.projects.length;let pull=false;
+ if(S.link!=user.uid){if(r)pull=empty||confirm('Este dispositivo tiene datos distintos a los de tu cuenta. Aceptar: usar los de la cuenta. Cancelar: subir los de este dispositivo.')}
+ else pull=!!r&&r.u>(S.u||0)&&!S.d;
+ if(pull){S={...JSON.parse(r.data),set:S.set,u:r.u,link:user.uid,d:0};store();R()}
+ else if(!r||S.d||S.link!=user.uid||(S.u||0)>r.u){S.link=user.uid;S.u=S.u||Date.now();await ref.set({data:JSON.stringify({pantry:S.pantry,projects:S.projects,profile:S.profile}),u:S.u});S.d=0}
+ S.last=Date.now();store();if(tab=='aj')R()}catch(e){toast('No se pudo sincronizar: '+(e.code||e.message))}
+ syncing=0}
 const TABS=[['desp','Despensa','<path d="M5 8h14l-1 12H6zM8 8V5h8v3"/>'],['ia','Nutri IA','<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>'],['menus','Menús','<path d="M7 3v8M5 3v5a2 2 0 004 0V3M7 11v10M17 21V3c-2 1-3 4-3 8h3"/>'],['perfil','Perfil','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'],['aj','Ajustes','<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>']];
-function R(){$('#app').innerHTML={desp:vDesp,ia:vIA,menus:vMenus,perfil:vPerfil,aj:vAj}[tab]();
+function R(){$('#app').innerHTML=(tab!='aj'&&db&&!user?'<div class="card" style="--k:var(--ac)"><button class="b" data-a="login">Entrar con Google para guardar en la nube</button></div>':'')+{desp:vDesp,ia:vIA,menus:vMenus,perfil:vPerfil,aj:vAj}[tab]();
 $('#nav').innerHTML=TABS.map(([k,n,p])=>`<button data-a="tab" data-k="${k}" class="${k==tab?'on':''} ${k=='menus'?'mid':''}"><svg viewBox="0 0 24 24">${p}</svg><span>${n}</span></button>`).join('')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A[b.dataset.a](b.dataset)});
 $('#ov').addEventListener('click',e=>{if(e.target.id=='ov')A.close()});
 document.addEventListener('change',e=>{const t=e.target;
- if(t.dataset.s){const[o,k]=t.dataset.s.split('.');S[o][k]=t.value;save();if(o=='set')theme();if(tab=='perfil')R()}
+ if(t.dataset.s){const[o,k]=t.dataset.s.split('.');S[o][k]=t.value;o=='set'?store():save();if(o=='set')theme();if(tab=='perfil')R()}
  else if(t.id=='ph'&&t.files[0])lab(t.files[0]);
  else if(t.id=='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);S={...d,set:{...d.set,key:S.set.key}};save();theme();R();toast('Copia restaurada')}catch{toast('Archivo inválido')}};r.readAsText(t.files[0])}});
 matchMedia('(prefers-color-scheme:dark)').onchange=theme;
 theme();R();
+fetch('/__/firebase/init.json').then(r=>r.ok?r.json():Promise.reject()).then(c=>{firebase.initializeApp(c);db=firebase.firestore();firebase.auth().onAuthStateChanged(u=>{user=u;R();sync()})}).catch(()=>{});
+addEventListener('online',sync);document.addEventListener('visibilitychange',()=>document.visibilityState=='visible'&&sync());
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 </script></body></html>
