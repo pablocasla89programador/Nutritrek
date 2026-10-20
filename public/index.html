@@ -42,8 +42,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],uid=()=>Math.random().toString(36).slice(2,9),
 esc=s=>String(s??'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),num=v=>parseFloat(v)||0,
-MEALS=['Desayuno','Almuerzo','Merienda','Cena'],CATS=['Entrada','Plato principal','Postre','Picar','Bebida','Infusión'];
-let S=JSON.parse(localStorage.getItem('nia')||'null')||{pantry:[],projects:[],profile:{},set:{theme:'auto',key:'',model:'gemini-2.5-flash'}},
+MEALS=['Desayuno','Almuerzo','Merienda','Cena'],CATS=['Entrada','Plato principal','Postre','Picar','Bebida','Infusión'],
+KINDS=['Suelto (se mezcla)','Paquete para cocinar','Liofilizado','Deshidratado','Paquete listo para consumo','Lata lista para consumo','Listo para consumo'],RDY=k=>/consumo/.test(k),
+norm=()=>S.pantry.forEach(f=>{f.kind=f.kind=='listo'?'Listo para consumo':KINDS.includes(f.kind)?f.kind:KINDS[0]});
+let S=JSON.parse(localStorage.getItem('nia')||'null')||{pantry:[],projects:[],profile:{},set:{theme:'auto',key:'',model:'gemini-3.8-flash'}},
 tab='menus',pid=null,showA=false,cur={},ia={},user=null,db=null,tm,syncing=0;
 const store=()=>localStorage.setItem('nia',JSON.stringify(S)),
 save=()=>{S.u=Date.now();S.d=1;store();clearTimeout(tm);tm=setTimeout(sync,1500)},
@@ -70,14 +72,14 @@ const fill=o=>['kcal','prot','carb','fat'].forEach(k=>$('#f_'+k).value=Math.roun
 NUT='Respondé SOLO JSON {"kcal":n,"prot":n,"carb":n,"fat":n} por 100 g (prot=proteínas, carb=carbohidratos, fat=grasas totales).';
 async function lab(f){toast('Leyendo etiqueta…');try{fill(await gem([{inlineData:{mimeType:'image/jpeg',data:await img(f)}},{text:'Es la tabla nutricional de un empaque. '+NUT+' Si está por porción, convertí con el peso de la porción.'}]));toast('Listo, revisá los valores')}catch(e){toast(e.message)}}
 const col=()=>{cur={...cur,day:num($('#dd').value)||1,meal:$('#mm').value,cat:$('#mc').value,name:$('#mn').value,items:$$('.it').map(r=>({id:r.querySelector('select').value,g:num(r.querySelector('input').value)}))}};
-function fF(f={}){cur=f;show(`<h3>${f.id?'Editar':'Nuevo'} alimento</h3>${fld('Nombre','fn',f.name)}<label>Tipo<select id="fk"><option value="mezcla" ${f.kind!='listo'?'selected':''}>Suelto (se mezcla con otros)</option><option value="listo" ${f.kind=='listo'?'selected':''}>Listo (liofilizado, deshidratado, termoestabilizado…)</option></select></label>${fld('Descripción (la IA la usa para estimar)','fd',f.desc)}<div class="r2">${fld('Peso neto (g)','fnet',f.net,'number')}${fld('Peso bruto con envase (g)','fgr',f.gross,'number')}</div><label>Información nutricional por 100 g</label><div class="r4">${[['kcal','kcal'],['prot','Prot'],['carb','Carb'],['fat','Gras']].map(([k,l])=>fld(l,'f_'+k,f[k],'number')).join('')}</div><div class="r2"><button data-a="scan">Foto de etiqueta</button><button data-a="est">Estimar con IA</button></div><input id="ph" type="file" accept="image/*" capture="environment" hidden><button class="b" data-a="saveF">Guardar</button>${f.id?'<button class="dg" data-a="delF">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
+function fF(f={}){cur=f;show(`<h3>${f.id?'Editar':'Nuevo'} alimento</h3>${fld('Nombre','fn',f.name)}<label>Tipo<select id="fk">${opt(KINDS,f.kind)}</select></label>${fld('Descripción (la IA la usa para estimar)','fd',f.desc)}<div class="r2">${fld('Peso neto (g)','fnet',f.net,'number')}${fld('Peso bruto con envase (g)','fgr',f.gross,'number')}</div><label>Información nutricional por 100 g</label><div class="r4">${[['kcal','kcal'],['prot','Prot'],['carb','Carb'],['fat','Gras']].map(([k,l])=>fld(l,'f_'+k,f[k],'number')).join('')}</div><div class="r2"><button data-a="scan">Foto de etiqueta</button><button data-a="est">Estimar con IA</button></div><input id="ph" type="file" accept="image/*" capture="environment" hidden><button class="b" data-a="saveF">Guardar</button>${f.id?'<button class="dg" data-a="delF">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
 function fM(m){cur=m;const pn=S.pantry.length;show(`<h3>${m.id?'Editar':'Nueva'} comida</h3><div class="r2">${fld('Día','dd',m.day||1,'number')}<label>Comida<select id="mm">${opt(MEALS,m.meal)}</select></label></div><label>Categoría<select id="mc">${opt(CATS,m.cat)}</select></label>${fld('Nombre o notas','mn',m.name)}<label>Alimentos de la despensa (gramos)</label>${m.items.map((it,i)=>`<div class="row it"><select>${S.pantry.map(f=>`<option value="${f.id}" ${f.id==it.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select><input type="number" inputmode="decimal" placeholder="g" value="${it.g||''}"><button data-a="delRow" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}<button data-a="addRow">Agregar alimento</button><button class="b" data-a="saveM">Guardar</button>${m.id?'<button class="dg" data-a="delM">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
 const A={
 tab:d=>{tab=d.k;pid=null;R()},close:()=>$('#ov').classList.add('hid'),
 addF:()=>fF(),editF:d=>fF(S.pantry.find(f=>f.id==d.id)),scan:()=>$('#ph').click(),
 saveF:()=>{const f={id:cur.id||uid(),name:$('#fn').value.trim(),kind:$('#fk').value,desc:$('#fd').value,net:num($('#fnet').value),gross:num($('#fgr').value)};['kcal','prot','carb','fat'].forEach(k=>f[k]=num($('#f_'+k).value));if(!f.name)return toast('Falta el nombre');const i=S.pantry.findIndex(x=>x.id==f.id);i<0?S.pantry.push(f):S.pantry[i]=f;save();A.close();R()},
 delF:()=>{if(confirm('¿Eliminar este alimento?')){S.pantry=S.pantry.filter(f=>f.id!=cur.id);save();A.close();R()}},
-est:async()=>{const n=$('#fn').value.trim();if(!n)return toast('Poné un nombre');toast('Estimando…');try{fill(await gem([{text:`Estimá la información nutricional de este alimento tal como se lleva en la mochila (sin preparar): "${n}". ${$('#fd').value}. ${NUT}`}]));toast('Listo, revisá los valores')}catch(e){toast(e.message)}},
+est:async()=>{const n=$('#fn').value.trim();if(!n)return toast('Poné un nombre');toast('Estimando…');try{fill(await gem([{text:`Estimá la información nutricional de este alimento tal como se lleva en la mochila (sin preparar): "${n}" (tipo: ${$('#fk').value}). ${$('#fd').value}. ${NUT}`}]));toast('Listo, revisá los valores')}catch(e){toast(e.message)}},
 newP:()=>{const n=prompt('Nombre del proyecto (ej. El Chaltén 2026)');if(n?.trim()){const p={id:uid(),name:n.trim(),menus:[]};S.projects.push(p);save();pid=p.id;R()}},
 openP:d=>{pid=d.id;R()},back:()=>{pid=null;R()},tgA:()=>{showA=!showA;R()},
 pmenu:()=>show(`<h3>${esc(P().name)}</h3><button data-a="editP">Editar nombre</button><button data-a="archP">${P().arch?'Desarchivar':'Archivar'}</button><button class="dg" data-a="delP">Eliminar proyecto</button><button class="g" data-a="close">Cerrar</button>`),
@@ -98,7 +100,7 @@ Días: ${ia.days}. Actividades: ${ia.act||'trekking con mochila'}. Clima: ${ia.c
 Persona: ${p.sex=='M'?'hombre':p.sex=='F'?'mujer':'sexo no indicado'}, ${age()||'?'} años, ${p.weight||'?'} kg, ${p.height||'?'} cm${n?`, requerimiento estimado ${n[1]} a ${n[2]} kcal/día`:''}.
 Despensa (id|nombre|tipo|descripción|valores por 100 g|disponible):
 ${S.pantry.map(f=>`${f.id}|${f.name}|${f.kind}|${f.desc||''}|${f.kcal} kcal P${f.prot} C${f.carb} G${f.fat}|${f.net} g`).join('\n')}
-Usá SOLO alimentos de la despensa con su id exacto y sin superar los gramos disponibles sumando todos los días. Priorizá calorías y carbohidratos, poco peso y preparación fácil en la montaña. Ajustá las kcal diarias al requerimiento.
+El tipo indica la preparación: los de consumo directo se comen sin cocinar; liofilizado, deshidratado y paquete para cocinar necesitan agua o cocción. Usá SOLO alimentos de la despensa con su id exacto y sin superar los gramos disponibles sumando todos los días. Priorizá calorías y carbohidratos, poco peso y preparación fácil en la montaña. Ajustá las kcal diarias al requerimiento.
 Respondé SOLO un array JSON: [{"day":1,"meal":"${MEALS[0]}","cat":"${CATS[1]}","name":"descripción corta","items":[{"id":"...","g":50}]}]. meal ∈ ${MEALS.join('/')}; cat ∈ ${CATS.join('/')}.`}]);
  ia.res=(Array.isArray(r)?r:r.menus||[]).map(m=>({day:num(m.day)||1,meal:MEALS.includes(m.meal)?m.meal:'Almuerzo',cat:CATS.includes(m.cat)?m.cat:'Plato principal',name:m.name||'',items:(m.items||[]).filter(i=>S.pantry.some(f=>f.id==i.id)).map(i=>({id:i.id,g:num(i.g)}))})).filter(m=>m.items.length);
  if(!ia.res.length)toast('La IA no devolvió menús válidos, probá de nuevo')}catch(e){toast(e.message)}
@@ -111,7 +113,7 @@ syncNow:()=>{toast('Sincronizando…');sync()}};
 const mk=m=>`<div class="card" style="--k:var(--m${MEALS.indexOf(m.meal)})" ${m.id?`data-a="editM" data-id="${m.id}"`:''}><div><b>${m.meal}</b> <i class="tag">${m.cat}</i></div><div>${esc(m.name)}</div><div class="mu">${m.items.map(i=>`${esc(nm(i.id))} ${i.g} g`).join(', ')}</div><div class="mx">${fm(mac(m))}</div></div>`,
 srt=a=>[...a].sort((x,y)=>x.day-y.day||MEALS.indexOf(x.meal)-MEALS.indexOf(y.meal));
 function vDesp(){const n=S.pantry.reduce((a,f)=>a+f.net,0),g=S.pantry.reduce((a,f)=>a+(f.gross||f.net),0);
-return`<div class="bar"><h1>Despensa</h1></div><div class="card"><span class="mu">Peso total a cargar</span><b>${(n/1000).toFixed(2)} kg neto, ${(g/1000).toFixed(2)} kg bruto</b></div>${S.pantry.map(f=>`<div class="card" style="--k:var(--m${f.kind=='listo'?0:1})" data-a="editF" data-id="${f.id}"><div><b>${esc(f.name)}</b> <i class="tag">${f.kind=='listo'?'listo':'suelto'}</i></div><div class="mu">${f.net} g neto, ${f.gross||f.net} g bruto</div><div class="mx"><span>por 100 g</span>${fm([f.kcal,f.prot,f.carb,f.fat])}</div></div>`).join('')||'<p class="mu c">Tu despensa está vacía. Agregá el primer alimento.</p>'}<button class="b fab" data-a="addF">Agregar alimento</button>`}
+return`<div class="bar"><h1>Despensa</h1></div><div class="card"><span class="mu">Peso total a cargar</span><b>${(n/1000).toFixed(2)} kg neto, ${(g/1000).toFixed(2)} kg bruto</b></div>${S.pantry.map(f=>`<div class="card" style="--k:var(--m${RDY(f.kind)?0:1})" data-a="editF" data-id="${f.id}"><div><b>${esc(f.name)}</b> <i class="tag">${esc(f.kind)}</i></div><div class="mu">${f.net} g neto, ${f.gross||f.net} g bruto</div><div class="mx"><span>por 100 g</span>${fm([f.kcal,f.prot,f.carb,f.fat])}</div></div>`).join('')||'<p class="mu c">Tu despensa está vacía. Agregá el primer alimento.</p>'}<button class="b fab" data-a="addF">Agregar alimento</button>`}
 function vMenus(){const p=P();
 if(!p){const l=S.projects.filter(x=>!!x.arch==showA);return`<div class="bar"><h1>Menús</h1><button class="b" data-a="newP">Nuevo proyecto</button></div>${l.map(x=>`<div class="card" style="--k:var(--ac)" data-a="openP" data-id="${x.id}"><b>${esc(x.name)}</b><span class="mu">${x.menus.length} comidas en ${Math.max(0,...x.menus.map(m=>m.day))} días</span></div>`).join('')||`<p class="mu c">${showA?'No hay proyectos archivados.':'Creá tu primer proyecto, por ejemplo “El Chaltén 2026”.'}</p>`}<button class="g mu" data-a="tgA">${showA?'Ver proyectos activos':'Ver archivados'}</button>`}
 const d=[...new Set(p.menus.map(m=>m.day))].sort((a,b)=>a-b),n=need();
@@ -127,7 +129,7 @@ async function sync(){
  try{const ref=db.doc('users/'+user.uid),snap=await ref.get(),r=snap.exists?snap.data():null,empty=!S.pantry.length&&!S.projects.length;let pull=false;
  if(S.link!=user.uid){if(r)pull=empty||confirm('Este dispositivo tiene datos distintos a los de tu cuenta. Aceptar: usar los de la cuenta. Cancelar: subir los de este dispositivo.')}
  else pull=!!r&&r.u>(S.u||0)&&!S.d;
- if(pull){S={...JSON.parse(r.data),set:S.set,u:r.u,link:user.uid,d:0};store();R()}
+ if(pull){S={...JSON.parse(r.data),set:S.set,u:r.u,link:user.uid,d:0};norm();store();R()}
  else if(!r||S.d||S.link!=user.uid||(S.u||0)>r.u){S.link=user.uid;S.u=S.u||Date.now();await ref.set({data:JSON.stringify({pantry:S.pantry,projects:S.projects,profile:S.profile}),u:S.u});S.d=0}
  S.last=Date.now();store();if(tab=='aj')R()}catch(e){toast('No se pudo sincronizar: '+(e.code||e.message))}
  syncing=0}
@@ -141,6 +143,8 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.id=='ph'&&t.files[0])lab(t.files[0]);
  else if(t.id=='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);S={...d,set:{...d.set,key:S.set.key}};save();theme();R();toast('Copia restaurada')}catch{toast('Archivo inválido')}};r.readAsText(t.files[0])}});
 matchMedia('(prefers-color-scheme:dark)').onchange=theme;
+if(S.set.model=='gemini-2.5-flash'){S.set.model='gemini-3.8-flash';store()}
+norm();store();
 theme();R();
 fetch('/__/firebase/init.json').then(r=>r.ok?r.json():Promise.reject()).then(c=>{firebase.initializeApp(c);db=firebase.firestore();firebase.auth().onAuthStateChanged(u=>{user=u;R();sync()})}).catch(()=>{});
 addEventListener('online',sync);document.addEventListener('visibilitychange',()=>document.visibilityState=='visible'&&sync());
