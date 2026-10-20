@@ -47,12 +47,12 @@ MEALS=['Desayuno','Almuerzo','Merienda','Cena'],CATS=['Entrada','Plato principal
 KINDS=['Suelto (se mezcla)','Paquete para cocinar','Liofilizado','Deshidratado','Paquete listo para consumo','Lata lista para consumo','Listo para consumo'],RDY=k=>/consumo/.test(k),
 norm=()=>{S.projects.forEach(p=>p.trip=p.trip||[]);S.pantry.forEach(f=>{f.kind=f.kind=='listo'?'Listo para consumo':KINDS.includes(f.kind)?f.kind:KINDS[0]})};
 let S=JSON.parse(localStorage.getItem('nia')||'null')||{pantry:[],projects:[],profile:{},set:{theme:'auto',key:'',model:'gemini-3.8-flash'}},
-tab='menus',pid=null,showA=false,cur={},ia={},user=null,db=null,tm,syncing=0,trip=false,PH=[null,null,null],PX=[false,false,false],lastCall=0;
+tab='menus',pid=null,showA=false,cur={},ia={},user=null,db=null,tm,syncing=0,trip=false,PH=[null,null,null],PX=[false,false,false],lastCall=0,hd=0,skip=0,ht;
 const store=()=>localStorage.setItem('nia',JSON.stringify(S)),
 save=()=>{S.u=Date.now();S.d=1;store();clearTimeout(tm);tm=setTimeout(sync,1500)},
 P=()=>S.projects.find(p=>p.id==pid),
 toast=m=>{const t=$('#t');t.textContent=m;t.hidden=false;clearTimeout(toast.i);toast.i=setTimeout(()=>t.hidden=true,3500)},
-show=h=>{$('#sh').innerHTML=h;$('#ov').classList.remove('hid')},
+show=h=>{$('#sh').innerHTML=h;$('#ov').classList.remove('hid');navSync()},
 st=m=>{const e=$('#st');e?e.textContent=m:toast(m)},
 opt=(a,v)=>a.map(x=>`<option ${x==v?'selected':''}>${x}</option>`).join(''),
 fld=(l,id,v,t='text')=>`<label>${l}<input id="${id}" type="${t}" value="${esc(v)}"${t=='number'?' inputmode="decimal" step="any"':''}></label>`,
@@ -84,10 +84,10 @@ async function lab(f){st('Leyendo etiqueta…');try{
  const v=fill(await gem([{inlineData:{mimeType:'image/jpeg',data:im}},{text:'Es la tabla nutricional de un empaque. '+NUT+' Si está por porción, convertí con el peso de la porción.'}],SCH));
  st(v.kcal||v.prot||v.carb||v.fat?'Listo, revisá los valores':'La IA no encontró valores en la foto. Probá con otra más cerca y con buena luz')}catch(e){fail(e)}}
 const col=()=>{cur={...cur,day:num($('#dd').value)||1,meal:$('#mm').value,cat:$('#mc').value,name:$('#mn').value,items:$$('.it').map(r=>({id:r.querySelector('select').value,g:num(r.querySelector('input').value)}))}};
-function fF(f={}){cur=f;PH=[null,null,null];PX=[false,false,false];setTimeout(()=>{[0,1,2].forEach(phView);loadPh(f)});show(`<h3>${f.id?'Editar':'Nuevo'} alimento</h3>${fld('Nombre','fn',f.name)}<label>Tipo<select id="fk">${opt(KINDS,f.kind)}</select></label>${fld('Descripción (la IA la usa para estimar)','fd',f.desc)}<div class="r2">${fld('Peso neto (g)','fnet',f.net,'number')}${fld('Peso bruto con envase (g)','fgr',f.gross,'number')}</div><label>Información nutricional (completá con lo que dice la etiqueta)</label><div class="r4">${[['kcal','kcal'],['prot','Prot'],['carb','Carb'],['fat','Gras']].map(([k,l])=>fld(l,'f_'+k,f[k],'number')).join('')}</div>${fld('Los valores de arriba son por cuántos gramos (porción de la etiqueta)','fpor',100,'number')}<p id="pv" class="mu"></p><label>Fotos del producto (hasta 3)</label>${PT.map((t,i)=>`<div><button class="g ph" data-a="phT" data-i="${i}">${i+1}. ${t}<span id="pc${i}" class="mu"></span></button><div id="pb${i}" class="hid"></div><input type="file" id="pf${i}" accept="image/*" hidden></div>`).join('')}<div class="r2"><button data-a="read">Leer fotos con IA</button><button data-a="est">Estimar con IA</button></div><p id="st" class="mu"></p><button class="b" data-a="saveF">Guardar</button>${f.id?'<button class="dg" data-a="delF">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
+function fF(f={}){cur=f;PH=[null,null,null];PX=[false,false,false];setTimeout(()=>{[0,1,2].forEach(phView);loadPh(f)});show(`<h3>${f.id?'Editar':'Nuevo'} alimento</h3>${fld('Nombre','fn',f.name)}<label>Tipo<select id="fk">${opt(KINDS,f.kind)}</select></label>${fld('Descripción (la IA la usa para estimar)','fd',f.desc)}<div class="r2">${fld('Peso neto (g)','fnet',f.net,'number')}${fld('Peso bruto con envase (g)','fgr',f.gross,'number')}</div><label>Información nutricional (completá con lo que dice la etiqueta)</label><div class="r4">${[['kcal','kcal'],['prot','Prot'],['carb','Carb'],['fat','Gras']].map(([k,l])=>fld(l,'f_'+k,f[k],'number')).join('')}</div>${fld('Los valores de arriba son por cuántos gramos (porción de la etiqueta)','fpor',100,'number')}<p id="pv" class="mu"></p><label>Fotos del producto (hasta 3)</label>${PT.map((t,i)=>`<div><button class="g ph" data-a="phT" data-i="${i}">${i+1}. ${t}<span id="pc${i}" class="mu"></span></button><div id="pb${i}" class="hid"></div><input type="file" id="pf${i}" accept="image/*" hidden><input type="file" id="pq${i}" accept="image/*" capture="environment" hidden></div>`).join('')}<div class="r2"><button data-a="read">Leer fotos con IA</button><button data-a="est">Estimar con IA</button></div><p id="st" class="mu"></p><button class="b" data-a="saveF">Guardar</button>${f.id?'<button class="dg" data-a="delF">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
 function fM(m){cur=m;const pn=S.pantry.length;show(`<h3>${m.id?'Editar':'Nueva'} comida</h3><div class="r2">${fld('Día','dd',m.day||1,'number')}<label>Comida<select id="mm">${opt(MEALS,m.meal)}</select></label></div><label>Categoría<select id="mc">${opt(CATS,m.cat)}</select></label>${fld('Nombre o notas','mn',m.name)}<label>Alimentos de la despensa (gramos)</label>${m.items.map((it,i)=>`<div class="row it"><select>${fl(it).map(f=>`<option value="${f.id}" ${f.id==it.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select><input type="number" inputmode="decimal" placeholder="g" value="${it.g||''}"><button data-a="delRow" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}<button data-a="addRow">Agregar alimento</button><button class="b" data-a="saveM">Guardar</button>${m.id?'<button class="dg" data-a="delM">Eliminar</button>':''}<button class="g" data-a="close">Cancelar</button>`)}
 const A={
-tab:d=>{tab=d.k;pid=null;trip=false;R()},close:()=>$('#ov').classList.add('hid'),
+tab:d=>{tab=d.k;pid=null;trip=false;R()},close:()=>{$('#ov').classList.add('hid');navSync()},
 addF:()=>fF(),editF:d=>fF(S.pantry.find(f=>f.id==d.id)),scan:()=>$('#ph').click(),
 saveF:()=>{const f={id:cur.id||uid(),name:$('#fn').value.trim(),kind:$('#fk').value,desc:$('#fd').value,net:num($('#fnet').value),gross:num($('#fgr').value)};const fc=100/(num($('#fpor').value)||100);['kcal','prot','carb','fat'].forEach(k=>f[k]=Math.round(num($('#f_'+k).value)*fc*10)/10);if(!f.name)return toast('Falta el nombre');f.ph=[0,1,2].map(i=>PX[i]?!!PH[i]:!!(cur.ph&&cur.ph[i]));[0,1,2].forEach(i=>PX[i]&&phWrite(f.id,i,PH[i]));const i=S.pantry.findIndex(x=>x.id==f.id);i<0?S.pantry.push(f):S.pantry[i]=f;save();A.close();R()},
 delF:()=>{if(confirm('¿Eliminar este alimento?')){[0,1,2].forEach(i=>cur.ph&&cur.ph[i]&&phWrite(cur.id,i,null));S.pantry=S.pantry.filter(f=>f.id!=cur.id);save();A.close();R()}},
@@ -127,7 +127,9 @@ login:async()=>{if(!db)return toast('El login con Google funciona en la versión
 logout:async()=>{await firebase.auth().signOut();S.link=null;store()},
 syncNow:()=>{toast('Sincronizando…');sync()},
 phT:d=>{const e=$('#pb'+d.i);e.classList.toggle('hid')},
-phAdd:d=>$('#pf'+d.i).click(),
+phAdd:d=>$('#po'+d.i).classList.toggle('hid'),
+phCam:d=>$('#pq'+d.i).click(),
+phGal:d=>$('#pf'+d.i).click(),
 phRm:d=>{PH[+d.i]=null;PX[+d.i]=true;phView(+d.i)},
 read:async()=>{const parts=[];let hk='';PH.forEach((v,i)=>{if(v){hk+=v;parts.push({text:`Foto ${i+1}: ${PT[i]}`},{inlineData:{mimeType:'image/jpeg',data:v.split(',')[1]}})}});
  if(!parts.length)return st('Cargá al menos una foto');
@@ -172,7 +174,7 @@ ps=async(k,v)=>{const d=await idb();return new Promise(ok=>{const t=d.transactio
 cloudPut=async(id,i,v)=>{if(!user||!db||!navigator.onLine)return false;try{const r=db.doc('users/'+user.uid+'/fotos/'+pk(id,i));v?await r.set({d:v,u:Date.now()}):await r.delete();return true}catch{return false}};
 async function phWrite(id,i,v){const k=pk(id,i);await ps(k,v);if(!await cloudPut(id,i,v)){S.pf=S.pf||{};S.pf[k]=1;store()}}
 async function flushPh(){for(const k of Object.keys(S.pf||{})){const n=k.lastIndexOf('-'),v=await pg(k);if(await cloudPut(k.slice(0,n),k.slice(n+1),v)){delete S.pf[k];store()}}}
-function phView(i){const e=$('#pb'+i);if(!e)return;e.innerHTML=(PH[i]?`<img src="${PH[i]}" alt="${PT[i]}" style="width:100%;border-radius:8px;margin:6px 0">`:'<p class="mu">Todavía no hay foto.</p>')+`<div class="r2"><button data-a="phAdd" data-i="${i}">${PH[i]?'Cambiar foto':'Sacar o subir foto'}</button>${PH[i]?`<button class="dg" data-a="phRm" data-i="${i}">Quitar</button>`:''}</div>`;const c=$('#pc'+i);if(c)c.textContent=PH[i]?'  con foto':''}
+function phView(i){const e=$('#pb'+i);if(!e)return;e.innerHTML=(PH[i]?`<img src="${PH[i]}" alt="${PT[i]}" style="width:100%;border-radius:8px;margin:6px 0">`:'<p class="mu">Todavía no hay foto.</p>')+`<div class="r2"><button data-a="phAdd" data-i="${i}">${PH[i]?'Cambiar foto':'Sacar o subir foto'}</button>${PH[i]?`<button class="dg" data-a="phRm" data-i="${i}">Quitar</button>`:''}</div><div id="po${i}" class="r2 hid" style="margin-top:6px"><button data-a="phCam" data-i="${i}">Sacar foto</button><button data-a="phGal" data-i="${i}">Subir de la galería</button></div>`;const c=$('#pc'+i);if(c)c.textContent=PH[i]?'  con foto':''}
 async function phSet(i,f){st('Procesando foto…');try{PH[i]='data:image/jpeg;base64,'+await img(f);PX[i]=true;phView(i);const e=$('#pb'+i);if(e)e.classList.remove('hid');st('')}catch(e){fail(e)}}
 async function loadPh(f){if(!f.id||!f.ph)return;for(let i=0;i<3;i++)if(f.ph[i]&&!PX[i]){let v=await pg(pk(f.id,i));if(!v&&user&&db&&navigator.onLine){try{const s=await db.doc('users/'+user.uid+'/fotos/'+pk(f.id,i)).get();if(s.exists){v=s.data().d;await ps(pk(f.id,i),v)}}catch{}}if(cur!==f)return;if(!PX[i]){PH[i]=v;phView(i)}}}
 const CK='nia-c',cget=k=>{try{return JSON.parse(localStorage.getItem(CK)||'{}')[k]}catch{}},
@@ -182,6 +184,10 @@ hs=s=>{let x=5381;for(let i=0;i<s.length;i+=37)x=((x<<5)+x+s.charCodeAt(i))|0;re
 fail=e=>{if(e.quota){st(e.message);toast(e.message)}else st('Error: '+e.message)};
 async function gem(parts,schema){const w=lastCall+4500-Date.now();if(w>0){st('Esperando '+Math.ceil(w/1000)+' s para no superar el límite de la IA…');await new Promise(r=>setTimeout(r,w))}try{return await gem0(parts,schema)}finally{lastCall=Date.now()}}
 function pv(){const e=$('#pv');if(!e)return;const g=num($('#fpor').value)||100;if(g==100){e.textContent='';return}const c=100/g,f=k=>Math.round(num($('#f_'+k).value)*c*10)/10;e.textContent=`Por 100 g: ${f('kcal')} kcal, P ${f('prot')}, C ${f('carb')}, G ${f('fat')}`}
+const depth=()=>($('#ov').classList.contains('hid')?0:1)+(trip&&pid?1:0)+(pid&&tab=='menus'?1:0)+(tab!='menus'?1:0);
+function navSync(){clearTimeout(ht);ht=setTimeout(()=>{const d=depth();if(d>hd){for(let i=hd;i<d;i++)history.pushState({n:i+1},'');hd=d}else if(d<hd){const k=hd-d;hd=d;skip++;setTimeout(()=>skip=0,600);history.go(-k)}},0)}
+function goBack(){if(!$('#ov').classList.contains('hid'))return A.close();if(trip){trip=false;return R()}if(pid){pid=null;return R()}if(tab!='menus'){tab='menus';R()}}
+addEventListener('popstate',()=>{if(skip){skip--;return}hd=Math.max(0,hd-1);goBack()});
 const acc=()=>user?`<div class="card" style="--k:var(--ac)"><b>${esc(user.displayName||'Cuenta')}</b><span class="mu">${esc(user.email)}</span><span class="mu">${S.d?'Hay cambios pendientes de subir':'Todo sincronizado'}${S.last?', revisado '+new Date(S.last).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''}</span><button data-a="syncNow">Sincronizar ahora</button><button class="g" data-a="logout">Cerrar sesión</button></div>`:`<div class="card" style="--k:var(--ac)"><b>Cuenta</b><span class="mu">Entrá con Google para guardar tus datos en la nube y verlos desde cualquier dispositivo.</span><button class="b" data-a="login">Entrar con Google</button></div>`;
 async function sync(){
  if(!user||!db||!navigator.onLine||syncing)return;syncing=1;
@@ -194,13 +200,13 @@ async function sync(){
  syncing=0}
 const TABS=[['desp','Despensa','<path d="M5 8h14l-1 12H6zM8 8V5h8v3"/>'],['ia','Nutri IA','<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>'],['menus','Menús','<path d="M7 3v8M5 3v5a2 2 0 004 0V3M7 11v10M17 21V3c-2 1-3 4-3 8h3"/>'],['perfil','Perfil','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'],['aj','Ajustes','<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>']];
 function R(){$('#app').innerHTML=(tab!='aj'&&db&&!user?'<div class="card" style="--k:var(--ac)"><button class="b" data-a="login">Entrar con Google para guardar en la nube</button></div>':'')+{desp:vDesp,ia:vIA,menus:vMenus,perfil:vPerfil,aj:vAj}[tab]();
-$('#nav').innerHTML=TABS.map(([k,n,p])=>`<button data-a="tab" data-k="${k}" class="${k==tab?'on':''} ${k=='menus'?'mid':''}"><svg viewBox="0 0 24 24">${p}</svg><span>${n}</span></button>`).join('')}
+$('#nav').innerHTML=TABS.map(([k,n,p])=>`<button data-a="tab" data-k="${k}" class="${k==tab?'on':''} ${k=='menus'?'mid':''}"><svg viewBox="0 0 24 24">${p}</svg><span>${n}</span></button>`).join('');navSync()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A[b.dataset.a](b.dataset)});
 $('#ov').addEventListener('click',e=>{if(e.target.id=='ov')A.close()});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.dataset.s){const[o,k]=t.dataset.s.split('.');S[o][k]=t.value;o=='set'?store():save();if(o=='set')theme();if(tab=='perfil')R()}
  else if(t.id=='tf'){const f=S.pantry.find(x=>x.id==t.value);$('#tn').value=f.net||'';$('#tg').value=f.gross||''}
- else if(t.id.startsWith('pf')&&t.files[0]){phSet(+t.id.slice(2),t.files[0]);t.value=''}
+ else if(/^p[fq]\d$/.test(t.id)&&t.files[0]){phSet(+t.id.slice(2),t.files[0]);t.value=''}
  else if(t.id=='ph'&&t.files[0])lab(t.files[0]);
  else if(t.id=='imp'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);S={...d,set:{...d.set,key:S.set.key}};norm();save();theme();R();toast('Copia restaurada')}catch{toast('Archivo inválido')}};r.readAsText(t.files[0])}});
 document.addEventListener('input',e=>{if(/^(fpor|f_)/.test(e.target.id))pv()});
